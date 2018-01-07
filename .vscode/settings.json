@@ -1,0 +1,6 @@
+{
+    "files.associations": {
+        "core_esp8266_wiring.c": "cpp",
+        "core_esp8266_noniso.c": "cpp"
+    }
+}
