@@ -1,4 +1,5 @@
 #include <EEPROM.h>
+
 #define LENGTH_NTP_HOST 30
 #define LENGTH_SSID 25
 #define LENGTH_SSID_PASS 25
