@@ -61,6 +61,7 @@
 #define W_MAC "mac"
 #define W_UPTIME "uptime"
 #define W_HEAP "heap"
+#define W_RESET_REASON "reset_reason"
 #define W_SDK "sdk"
 #define W_BUILD "build"
 #define W_HOUR "hour"
@@ -145,6 +146,7 @@ void callAPIInfo(){
   out[W_MAC] = WiFi.macAddress();
   out[W_UPTIME] = uptime;
   out[W_HEAP] = ESP.getFreeHeap();
+  out[W_RESET_REASON] = ESP.getResetReason();
   out[W_BUILD] = buildTimeFirmware;
   out[W_DESCRIPTION] = "Mustek PowerMust 600 USB";
 
@@ -425,7 +427,7 @@ void pageOverview() {
   
   char timeSlot[25] = {0}; 
   if (autoMode){
-    if (activeSchedule > 0){
+    if (activeSchedule >= 0){
       global.data.schedule[activeSchedule].toCharArray(timeSlot);
       tableOverview->setCell(9, 1, timeSlot);
     } else {
@@ -700,7 +702,7 @@ void loop() {
 
     tsReconnect = millis() + TIMEOUT_RECONNECT;
   }
-
+  ESP.wdtFeed(); 
   if ((autoMode)&&((tsRelayUpdate == 0)||(tsRelayUpdate < millis()))){
     DateTime now = rtc.now();
     activeSchedule = global.getActiveSchedule(now);
@@ -721,5 +723,6 @@ void loop() {
     }
   }
 
+  ESP.wdtFeed(); 
   echoServer.maintenance();
 }
