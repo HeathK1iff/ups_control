@@ -1,5 +1,7 @@
 #define DEFAULT_SSID_PSW "!T@74j22casdW"
 
+#define USE_OTA_UPDATE
+
 #define TIMEOUT_RECONNECT MIN_MS*5
 #define TIMEOUT_CHECK_UPS SEC_MS*7
 #define RESPOND_BUFFER_SIZE 600
@@ -27,6 +29,8 @@
 
 #define API_METHOD_MAIN "/"
 #define API_METHOD_NETWORK "/network.html"
+#define API_METHOD_SYSTEM "/system.html"
+#define API_METHOD_FIRMWARE_UPLOAD "/firmware_upload.do"
 #define API_METHOD_API_HELP "/rpc"
 #define API_METHOD_INFO "/rpc/info.json"
 #define API_METHOD_SENSORS "/rpc/sensors.json"
@@ -363,15 +367,23 @@ void makeTabs(HtmlPage *page, int pageIndex) {
   group->append("width", "100px");
   group->append("height", "40px");
 
-	HtmlTable *tabs = new HtmlTable(2);
+	#ifdef USE_OTA_UPDATE
+  HtmlTable *tabs = new HtmlTable(3);
+  #else
+  HtmlTable *tabs = new HtmlTable(2);
+  #endif
+
 	tabs->append();
 	tabs->getAttributes()->append("class", "tabs");
 	tabs->getStyle()->append("width", "300px");
 	tabs->getStyle()->append("background-color", "#DAF7A6");
 	tabs->getCellStyle(0, pageIndex)->append("background-color", "#33ff6e");
-	tabs->setCell(0, 0, new HtmlLink("/", "Overview"));
-  tabs->setCell(0, 1, new HtmlLink("/network.html", "Network"));
-	page->getHeader()->append(tabs);
+	tabs->setCell(0, 0, new HtmlLink(API_METHOD_MAIN, "Overview"));
+  tabs->setCell(0, 1, new HtmlLink(API_METHOD_NETWORK, "Network"));
+	#ifdef USE_OTA_UPDATE
+  tabs->setCell(0, 2, new HtmlLink(API_METHOD_SYSTEM, "System"));
+  #endif
+  page->getHeader()->append(tabs);
 }
 
 void pageOverview() { 
@@ -431,7 +443,7 @@ void pageOverview() {
       global.data.schedule[activeSchedule].toCharArray(timeSlot);
       tableOverview->setCell(9, 1, timeSlot);
     } else {
-      tableOverview->setCell(9, 1, "auto(not defined)");
+      tableOverview->setCell(9, 1, "auto");
     }
   } else {
     if (digitalRead(PIN_RELAY) == HIGH){
@@ -440,15 +452,35 @@ void pageOverview() {
       tableOverview->setCell(9, 1, "manual(off)");
     }
   }
+  htmlPage->append(tableOverview); 
 
   if (hasTempSensor){
     sensors.requestTemperatures();
-    int r = tableOverview->append();
-    tableOverview->setCell(r, 0, "Temperature:");
-    tableOverview->setCell(r, 1, sensors.getTempC(tempAddress));
+    HtmlTable *tableSensors = new HtmlTable(2);
+    tableSensors->append();
+    tableSensors->getStyle()->append("width", "300px");
+    tableSensors->getCellAttribute(0, 0)->append("colspan", 2);
+    tableSensors->getCellAttribute(0, 0)->append("align", "center");
+    tableSensors->getStyle()->append("border", "1px solid #cdd0d4");
+    tableSensors->getCellStyle(0, 0)->append("background-color", "#cdd0d4");
+    tableSensors->setCell(0, 0, "Sensors");
+    
+    sensors.requestTemperatures();
+    
+    int sensorCount = sensors.getDeviceCount();
+    for (int i = 0; i < sensorCount; i++) {
+      DeviceAddress device_addr;
+      char sensorAddr[18]; 
+      sensors.getAddress(device_addr, i);
+      addr2str(device_addr, sensorAddr);
+      int r = tableSensors->append();
+      tableSensors->setCell(r, 0, sensorAddr);
+      tableSensors->setCell(r, 1, sensors.getTempC(device_addr));
+    }
+    htmlPage->append(tableSensors);
   }
 
-  htmlPage->append(tableOverview); 
+  
   HtmlTable *tableSchedule = new HtmlTable(2);
   tableSchedule->append();
   tableSchedule->getStyle()->append("width", "300px");
@@ -505,6 +537,119 @@ void pageOverview() {
   delete htmlPage;
 }
 
+#ifdef USE_OTA_UPDATE
+void pageFirmwareUpgrade(){
+      HTTPUpload& upload = server.upload();
+      if(upload.status == UPLOAD_FILE_START){
+        global.setUpdateLastError(0);
+        WiFiUDP::stopAll();
+        uint32_t maxSketchSpace = (ESP.getFreeSketchSpace() - 0x1000) & 0xFFFFF000;
+        if(!Update.begin(maxSketchSpace)){
+          global.setUpdateLastError(Update.getError());
+        }
+      } else if(upload.status == UPLOAD_FILE_WRITE){
+        if(Update.write(upload.buf, upload.currentSize) != upload.currentSize){
+          global.setUpdateLastError(Update.getError());
+        }
+      } else if(upload.status == UPLOAD_FILE_END){
+        Update.end(true); 
+        global.setUpdateLastError(Update.getError());
+      }
+      yield();
+}
+
+
+void pageFirmwareUpload(){
+  server.send(200, "text/plain", (Update.hasError())?"FAIL":"OK");
+  ESP.restart();
+}
+
+
+void pageSystem(){
+  HtmlPage *htmlPage = new HtmlPage();
+  makeTabs(htmlPage, 2);
+
+  HtmlTable *tableInfo = new HtmlTable(2);
+	tableInfo->append(8);
+	tableInfo->getStyle()->append("width", "300px");
+	tableInfo->getCellAttribute(0, 0)->append("colspan", 2);
+	tableInfo->getCellAttribute(0, 0)->append("align", "center");
+	tableInfo->getStyle()->append("border", "1px solid #cdd0d4");
+	tableInfo->getCellStyle(0, 0)->append("background-color", "#cdd0d4");
+  tableInfo->setCell(0, 0, "Info");
+  tableInfo->setCell(1, 0, "Chip Id:");
+  tableInfo->setCell(1, 1, ((int) ESP.getChipId()));
+  tableInfo->setCell(2, 0, "Core:");
+  tableInfo->setCell(2, 1, ESP.getCoreVersion().c_str());
+  tableInfo->setCell(3, 0, "SDK ver:");
+  tableInfo->setCell(3, 1, ESP.getSdkVersion());
+  tableInfo->setCell(4, 0, "Frequency:");
+  tableInfo->setCell(4, 1, ((int) ESP.getCpuFreqMHz()));
+  tableInfo->setCell(5, 0, "Memory Size:");
+  tableInfo->setCell(5, 1, ((int) ESP.getFlashChipSize()));
+  tableInfo->setCell(6, 0, "Sketch Size:");
+  tableInfo->setCell(6, 1, ((int) ESP.getFreeSketchSpace()));
+  
+  tableInfo->setCell(7, 0, "Update Error:");
+  if(global.data.updateLastError == UPDATE_ERROR_OK){
+    tableInfo->setCell(7, 1, "OK");
+  } else if(global.data.updateLastError == UPDATE_ERROR_WRITE){
+    tableInfo->setCell(7, 1, "ERR_WRITE");
+  } else if(global.data.updateLastError == UPDATE_ERROR_ERASE){
+    tableInfo->setCell(7, 1, "ERR_ERASE");
+  } else if(global.data.updateLastError == UPDATE_ERROR_READ){
+    tableInfo->setCell(7, 1, "ERR_READ");
+  } else if(global.data.updateLastError == UPDATE_ERROR_SPACE){
+    tableInfo->setCell(7, 1, "ERR_SPACE");
+  } else if(global.data.updateLastError == UPDATE_ERROR_SIZE){
+    tableInfo->setCell(7, 1, "ERR_SIZE");
+  } else if(global.data.updateLastError == UPDATE_ERROR_STREAM){
+    tableInfo->setCell(7, 1, "ERR_STREAM");
+  } else if(global.data.updateLastError == UPDATE_ERROR_MD5){
+    tableInfo->setCell(7, 1, "ERR_MD5");
+  } else if(global.data.updateLastError == UPDATE_ERROR_FLASH_CONFIG){
+    tableInfo->setCell(7, 1, "ERR_FLASH_CONFIG");
+  } else if(global.data.updateLastError == UPDATE_ERROR_MAGIC_BYTE){
+    tableInfo->setCell(7, 1, "ERR_MAGIC_BYTE");
+  } else if (global.data.updateLastError == UPDATE_ERROR_BOOTSTRAP){
+    tableInfo->setCell(7, 1, "ERR_BOOTSTRAP");
+  } else {
+    tableInfo->setCell(7, 1, "UNKNOWN");
+  }
+  
+  htmlPage->append(tableInfo); 
+  
+  HtmlForm *uploadForm = new HtmlForm("upload", API_METHOD_FIRMWARE_UPLOAD, Post);
+  uploadForm->getAttributes()->append("enctype", "multipart/form-data");
+  HtmlUpload *uploadInput = new HtmlUpload();
+  uploadInput->getAttributes()->append("name", "update");
+  uploadForm->append(uploadInput);
+  HtmlButton *uploadButton = new HtmlButton("update");
+  uploadButton->getAttributes()->append("name", "update");
+  uploadForm->append(uploadButton);
+  
+  HtmlTable *tableUpload = new HtmlTable(2);
+	tableUpload->append(2);
+	tableUpload->getStyle()->append("width", "300px");
+	tableUpload->getCellAttribute(0, 0)->append("colspan", 2);
+	tableUpload->getCellAttribute(0, 0)->append("align", "center");
+	tableUpload->getStyle()->append("border", "1px solid #cdd0d4");
+	tableUpload->getCellStyle(0, 0)->append("background-color", "#cdd0d4");
+  tableUpload->setCell(0, 0, "Hardware");
+  tableUpload->getCellAttribute(1, 0)->append("colspan", 2);
+  tableUpload->setCell(1, 0, uploadForm);
+
+  htmlPage->append(tableUpload); 
+
+  char html_overiview[1900];
+  html_overiview[0] = '\0';
+  htmlPage->print(html_overiview);
+  server.send(200, "text/html", html_overiview);
+  delete htmlPage;
+
+}
+#endif
+
 char* makeAPIUrl(char *buf, char *url){
   if (WiFi.getMode()==WIFI_STA){
     sprintf(buf, "http://%s%s", WiFi.localIP().toString().c_str(), url);
@@ -545,7 +690,7 @@ void pageAPIHelp() {
 void pageNotFound() {
   HtmlPage *htmlPage = new HtmlPage();
   char buf[50];
-  HtmlTag *headText = new HtmlTag("h1");
+  HtmlTag *headText = new HtmlTag("h3");
   headText->setText("Page not found. Please see API information in link below");
   htmlPage->append(headText);
   htmlPage->append(new HtmlTag("br"));
@@ -567,15 +712,16 @@ void pageNetwork() {
       String ssid = server.arg(W_SSID);
       String psw = server.arg(W_PASS);
       server.send(200, "text/html", "The wifi connection will be changed.");
-
+      
+      delay(100);
       if (connectTo(ssid.c_str(), psw.c_str()))
       {
         global.data.ssid[0] = '\0';
         global.data.ssidPass[0] = '\0';
         strcpy(global.data.ssid, ssid.c_str());
         strcpy(global.data.ssidPass, psw.c_str());
+        global.save();
       } 
-      global.save();
       return;
     }
   }
@@ -664,6 +810,10 @@ void setup() {
   //Web Pages
   server.on(API_METHOD_MAIN, pageOverview);
   server.on(API_METHOD_NETWORK, pageNetwork);
+  #ifdef USE_OTA_UPDATE
+  server.on(API_METHOD_SYSTEM, pageSystem);
+  server.on(API_METHOD_FIRMWARE_UPLOAD, HTTP_POST, pageFirmwareUpload, pageFirmwareUpgrade);
+  #endif
   server.on(API_METHOD_INFO, callAPIInfo);
   server.on(API_METHOD_SETTING, callAPISetting);
   server.on(API_METHOD_SCHEDULE, callAPISchedule);
@@ -683,9 +833,9 @@ void setup() {
 void loop() { 
   server.handleClient();
   upsinfo.update();
-  ESP.wdtFeed();
   global.maintenance();
-  ESP.wdtFeed(); 
+  yield();
+
   if ((tsReconnect == 0)||(tsReconnect < millis()))
   { 
     bool changedConnection = false;
@@ -702,7 +852,8 @@ void loop() {
 
     tsReconnect = millis() + TIMEOUT_RECONNECT;
   }
-  ESP.wdtFeed(); 
+  yield(); 
+  
   if ((autoMode)&&((tsRelayUpdate == 0)||(tsRelayUpdate < millis()))){
     DateTime now = rtc.now();
     activeSchedule = global.getActiveSchedule(now);
@@ -713,7 +864,7 @@ void loop() {
     }
 
     tsRelayUpdate = millis() + MIN_MS; 
-    ESP.wdtFeed();
+    yield();
   }
 
   if (WiFi.isConnected()) {
@@ -723,6 +874,6 @@ void loop() {
     }
   }
 
-  ESP.wdtFeed(); 
+  yield(); 
   echoServer.maintenance();
 }

@@ -51,6 +51,7 @@ struct Setting {
   char ssidPass[LENGTH_SSID_PASS];
   char ntpHost[LENGTH_NTP_HOST];
   bool autoMode;
+  uint8_t updateLastError; 
 };
 
 struct TimeSlot{
@@ -129,6 +130,11 @@ class GlobalSetting {
     GlobalSetting() {
       init();
       load();
+    }
+
+    void setUpdateLastError(uint8_t errorIndex){      
+      data.updateLastError = errorIndex;
+      save(true);
     }
 
     void maintenance(){

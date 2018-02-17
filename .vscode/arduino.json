@@ -1,8 +1,8 @@
 {
     "board": "esp8266:esp8266:generic",
     "com": "COM3",
-    "configuration": "CpuFrequency=80,ResetMethod=ck,CrystalFreq=26,FlashFreq=40,FlashMode=dio,FlashSize=512K64,LwIPVariant=v2mss536,Debug=Disabled,DebugLevel=None____,UploadSpeed=115200",
+    "configuration": "CpuFrequency=80,ResetMethod=ck,CrystalFreq=26,FlashFreq=40,FlashMode=dio,FlashSize=1M64,LwIPVariant=Prebuilt,Debug=Disabled,DebugLevel=None____,UploadSpeed=115200",
     "output": "/build",
     "sketch": "ups_control.ino",
-    "port": "COM4"
+    "port": "COM3"
 }

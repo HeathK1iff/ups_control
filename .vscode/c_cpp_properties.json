@@ -9,9 +9,9 @@
                 "limitSymbolsToIncludedHeaders": false,
                 "path": [
                     "C:\\Users\\Heathk1iff\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.4.0\\cores\\esp8266",
-                    "D:\\Documents\\Arduino\\libraries",
+                    "E:\\Documents\\Arduino\\libraries",
                     "C:\\Users\\Heathk1iff\\AppData\\Local\\Arduino15\\packages\\esp8266\\hardware\\esp8266\\2.4.0\\libraries",
-                    "D:\\Tools\\Arduino\\hardware\\arduino\\avr\\libraries",
+                    "E:\\Documents\\tools\\Arduino\\hardware\\arduino\\avr\\libraries",
                     "${workspaceRoot}"
                 ]
             },

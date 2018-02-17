@@ -71,9 +71,10 @@ bool connectTo(const char *ssid, const char *psw)
     WiFi.mode(WIFI_STA);
     WiFi.begin(ssid, psw);
     
-    ESP.wdtDisable();
-    WiFi.waitForConnectResult();
-    ESP.wdtEnable(0);
+    while (WiFi.status() != WL_CONNECTED){
+      ESP.wdtFeed();
+      delay(1);
+    };
     return WiFi.isConnected();
 }
 
